@@ -1,0 +1,51 @@
+﻿@model Live_Video_Streaming.Models.Video
+
+
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Video Streaming</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="~/microsoft/signalr/dist/browser/signalr.js"></script>
+    <script src="~/microsoft/signalr/dist/browser/signalr.min.js"></script>
+</head>
+<body>
+    <h1>Live Video Streaming</h1>
+    <video id="video" autoplay controls></video>
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/videoHub")
+            .build();
+
+        connection.on("ReceiveVideoData", function (videoData) {
+            const video = document.getElementById("video");
+            const blob = new Blob([new Uint8Array(videoData)], { type: 'video/webm' });
+            video.src = URL.createObjectURL(blob);
+        });
+
+        connection.start().catch(err => console.error(err.toString()));
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                const video = document.getElementById("video");
+                video.srcObject = stream;
+
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = async (event) => {
+                    if (event.data.size > 0) {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        connection.invoke("SendVideoData", new Uint8Array(arrayBuffer));
+                    }
+                };
+                mediaRecorder.start(10); // Send data every 100 ms
+            })
+            .catch(err => console.error('Error accessing media devices.', err));
+    </script>
+</body>
+</html>
